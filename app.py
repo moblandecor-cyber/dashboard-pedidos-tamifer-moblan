@@ -237,7 +237,7 @@ with col4:
     st.plotly_chart(fig4, use_container_width=True)
 
 # ── Top Produtos ──────────────────────────────────────────────────────────────
-st.subheader("Top 10 Produtos por Faturamento")
+st.subheader("Quantidade por Produto")
 
 # Normaliza nomes de produto para agrupar similares
 def normaliza(nome):
@@ -271,28 +271,82 @@ df_top = (
     .head(10)
 )
 
-fig5 = px.bar(
-    df_top,
-    y="produto_grupo",
-    x="faturamento",
-    orientation="h",
-    color="faturamento",
-    color_continuous_scale="Blues",
-    text_auto=False,
-    labels={"produto_grupo": "Produto", "faturamento": "Faturamento (R$)"},
+df_top_qtd = (
+    df_itens.groupby("produto_grupo", as_index=False)
+    .agg(faturamento=("total", "sum"), quantidade=("qtd", "sum"))
+    .sort_values("quantidade", ascending=False)
+    .head(10)
 )
-fig5.update_traces(
-    texttemplate="R$ %{x:,.0f}",
-    textposition="outside",
+
+col_p1, col_p2 = st.columns(2)
+
+with col_p1:
+    st.markdown("**Top 10 por Quantidade Vendida (un)**")
+    fig5a = px.bar(
+        df_top_qtd.sort_values("quantidade"),
+        y="produto_grupo",
+        x="quantidade",
+        orientation="h",
+        color="quantidade",
+        color_continuous_scale="Oranges",
+        labels={"produto_grupo": "Produto", "quantidade": "Quantidade (un)"},
+    )
+    fig5a.update_traces(texttemplate="%{x} un", textposition="outside")
+    fig5a.update_layout(
+        coloraxis_showscale=False,
+        yaxis=dict(autorange="reversed"),
+        margin=dict(t=10),
+        height=380,
+    )
+    st.plotly_chart(fig5a, use_container_width=True)
+
+with col_p2:
+    st.markdown("**Top 10 por Faturamento (R$)**")
+    df_top_fat = (
+        df_itens.groupby("produto_grupo", as_index=False)
+        .agg(faturamento=("total", "sum"), quantidade=("qtd", "sum"))
+        .sort_values("faturamento", ascending=False)
+        .head(10)
+    )
+    fig5b = px.bar(
+        df_top_fat.sort_values("faturamento"),
+        y="produto_grupo",
+        x="faturamento",
+        orientation="h",
+        color="faturamento",
+        color_continuous_scale="Blues",
+        labels={"produto_grupo": "Produto", "faturamento": "Faturamento (R$)"},
+    )
+    fig5b.update_traces(texttemplate="R$ %{x:,.0f}", textposition="outside")
+    fig5b.update_layout(
+        xaxis_tickformat=",.0f",
+        coloraxis_showscale=False,
+        yaxis=dict(autorange="reversed"),
+        margin=dict(t=10),
+        height=380,
+    )
+    st.plotly_chart(fig5b, use_container_width=True)
+
+# ── Tabela detalhada por produto ──────────────────────────────────────────────
+st.subheader("Tabela Detalhada por Produto")
+df_prod_tabela = (
+    df_itens.groupby("produto_grupo", as_index=False)
+    .agg(quantidade=("qtd", "sum"), faturamento=("total", "sum"))
+    .sort_values("faturamento", ascending=False)
 )
-fig5.update_layout(
-    xaxis_tickformat=",.0f",
-    coloraxis_showscale=False,
-    yaxis=dict(autorange="reversed"),
-    margin=dict(t=10),
-    height=380,
+df_prod_tabela["faturamento_fmt"] = df_prod_tabela["faturamento"].apply(
+    lambda v: f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 )
-st.plotly_chart(fig5, use_container_width=True)
+df_prod_tabela["ticket_medio"] = (df_prod_tabela["faturamento"] / df_prod_tabela["quantidade"]).apply(
+    lambda v: f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+)
+df_prod_tabela = df_prod_tabela.rename(columns={
+    "produto_grupo": "Produto",
+    "quantidade": "Qtd. Total (un)",
+    "faturamento_fmt": "Faturamento Total",
+    "ticket_medio": "Valor Médio / Un",
+}).drop(columns=["faturamento"])
+st.dataframe(df_prod_tabela, use_container_width=True, hide_index=True)
 
 # ── Tabela de pedidos ─────────────────────────────────────────────────────────
 st.subheader("Tabela de Pedidos")
